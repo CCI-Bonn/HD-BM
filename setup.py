@@ -16,7 +16,7 @@ setup(name='hd_bm',
       zip_safe=False,
       install_requires=[
           'torch',
-          'nnunet @ git+https://github.com/MIC-DKFZ/nnUNet',
+          'nnunet @ git+https://github.com/MIC-DKFZ/nnUNet@v1.7.1',
           'batchgenerators',
           'matplotlib'
       ],
