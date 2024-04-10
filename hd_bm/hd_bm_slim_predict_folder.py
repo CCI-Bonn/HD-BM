@@ -28,29 +28,29 @@ from hd_bm.setup_hd_bm import maybe_download_weights
 def main():
     parser = argparse.ArgumentParser(
         description="This script will allow you to run HD-BM (slim) to predict multiple cases with modalities"
-                    " (with index):\n T1ce (0000), FLAIR (0001)"
-                    "The different modalities should follow nnUNet naming convention `{SOME_ID}_{ModalityID}.nii.gz`"
-                    "To predict single cases, please use `hd_bm_slim_predict`"
-                    "Should you have access to the T1 and T1sub modality please use the `hd_bm_predict` or "
-                    "`hd_bm_predict_folder` function instead."
-        )
-    
+        " (with index):\n T1ce (0000), FLAIR (0001)"
+        "The different modalities should follow nnUNet naming convention `{SOME_ID}_{ModalityID}.nii.gz`"
+        "To predict single cases, please use `hd_bm_slim_predict`"
+        "Should you have access to the T1 and T1sub modality please use the `hd_bm_predict` or "
+        "`hd_bm_predict_folder` function instead."
+    )
+
     parser.add_argument(
         "-i",
         "--input_folder",
         type=str,
         required=True,
         help="Folder containing input files (no nested folder structure supported)."
-             " All .nii.gz files in this folder are attempted to be processed.",
-        )
+        " All .nii.gz files in this folder are attempted to be processed.",
+    )
     parser.add_argument(
         "-o",
         "--output_folder",
         type=str,
         required=True,
         help="Output folder. This is where the resulting segmentations will be saved. Cannot be the "
-             "same folder as the input folder. If output_folder does not exist it will be created",
-        )
+        "same folder as the input folder. If output_folder does not exist it will be created",
+    )
     parser.add_argument(
         "-p",
         "--processes",
@@ -58,17 +58,17 @@ def main():
         type=str,
         required=False,
         help="Number of processes for data preprocessing and nifti export. You should not have to "
-             "touch this. So don't unless there is a clear indication that it is required. Default: 4",
-        )
+        "touch this. So don't unless there is a clear indication that it is required. Default: 4",
+    )
     parser.add_argument(
         "--keep_existing",
         default=True,
         required=False,
         action="store_false",
         help="Set to False to overwrite segmentations in output_folder. If true continue where you left off "
-             "(useful if something crashes). If this flag is not set, all segmentations that may "
-             "already be present in output_folder will be kept.",
-        )
+        "(useful if something crashes). If this flag is not set, all segmentations that may "
+        "already be present in output_folder will be kept.",
+    )
     parser.add_argument(
         "-mod",
         "--skip_modality_check",
@@ -77,21 +77,29 @@ def main():
         default=0,
         help="Optional: Skips asking if the modalities are provided as expected",
         nargs="?",
-        )
-    
+    )
+    parser.add_argument(
+        "--verbose",
+        required=False,
+        default=False,
+        action="store_true",
+        help="Optional: Skips asking if the modalities are provided as expected",
+    )
+
     args = parser.parse_args()
     input_folder = args.input_folder
     output_folder = args.output_folder
     processes = args.processes
     keep_existing = args.keep_existing
     skip_modality = args.skip_modality_check
-    
+    verbose = args.verbose
+
     maybe_download_weights()
-    
+
     # we must generate a list of input filenames
     nii_files = subfiles(input_folder, suffix=".nii.gz", join=False)
     unique_ids = list(set([file[:-12] for file in nii_files]))
-    
+
     input_image_names = []
     output_names = []
     for unique_id in unique_ids:
@@ -101,10 +109,13 @@ def main():
             output_dir=output_folder,
             output_id=None,
             skip_modality_confirmation=skip_modality,
-            )
+        )
         input_image_names.append(input_image_mod_names)
         output_names.append(output_name)
-    
+
+    if verbose:
+        print("Predicting cases. This may take a while ...")
+        blockPrint()
     predict_cases(
         model=folder_with_hd_bm_slim_parameter_files,
         list_of_lists=input_image_names,
@@ -118,7 +129,9 @@ def main():
         mixed_precision=None,
         overwrite_existing=not keep_existing,
         all_in_gpu=False,
-        )
+    )
+    enablePrint()
+    print("Finished predicting HD-BM Slim. \n Exiting")
 
 
 if __name__ == "__main__":

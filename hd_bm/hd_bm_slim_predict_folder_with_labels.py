@@ -17,22 +17,23 @@ from hd_bm.utils import blockPrint, enablePrint
 
 blockPrint()
 from nnunet.inference.predict import predict_cases
+from nnunet.evaluation.evaluator import evaluate_folder
 
 enablePrint()
 import argparse
-from hd_bm.paths import folder_with_hd_bm_parameter_files
-from hd_bm.prepare_input_args import prepare_input_args_hd_bm
+from hd_bm.paths import folder_with_hd_bm_slim_parameter_files
+from hd_bm.prepare_input_args import prepare_input_args_hd_bm_slim
 from hd_bm.setup_hd_bm import maybe_download_weights
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="This script will allow you to predict HD-BM for multiple cases coming with modalities (with "
-        "index):\n T1 (0000), T1ce (0001), FLAIR (0002) and T1sub (0003)"
+        description="This script will allow you to run HD-BM (slim) to predict multiple cases with modalities"
+        " (with index):\n T1ce (0000), FLAIR (0001)"
         "The different modalities should follow nnUNet naming convention `{SOME_ID}_{ModalityID}.nii.gz`"
-        "To predict a single case in please use `hd_bm_predict`"
-        "Should you only have access to T1ce and FLAIR modalities please use the `hd_bm_slim_predict` or "
-        "`hd_bm_slim_predict_folder` function."
+        "To predict single cases, please use `hd_bm_slim_predict`"
+        "Should you have access to the T1 and T1sub modality please use the `hd_bm_predict` or "
+        "`hd_bm_predict_folder` function instead."
     )
 
     parser.add_argument(
@@ -50,6 +51,13 @@ def main():
         required=True,
         help="Output folder. This is where the resulting segmentations will be saved. Cannot be the "
         "same folder as the input folder. If output_folder does not exist it will be created",
+    )
+    parser.add_argument(
+        "-gt",
+        "--groundtruth_folder",
+        type=str,
+        required=True,
+        help="Folder containing ground truth segmentations for the input cases provided.",
     )
     parser.add_argument(
         "-p",
@@ -89,6 +97,7 @@ def main():
     args = parser.parse_args()
     input_folder = args.input_folder
     output_folder = args.output_folder
+    groundtruth_folder = args.groundtruth_folder
     processes = args.processes
     keep_existing = args.keep_existing
     skip_modality = args.skip_modality_check
@@ -103,7 +112,7 @@ def main():
     input_image_names = []
     output_names = []
     for unique_id in unique_ids:
-        input_image_mod_names, output_name = prepare_input_args_hd_bm(
+        input_image_mod_names, output_name = prepare_input_args_hd_bm_slim(
             input_dir=input_folder,
             input_id=unique_id,
             output_dir=output_folder,
@@ -117,7 +126,7 @@ def main():
         print("Predicting cases. This may take a while ...")
         blockPrint()
     predict_cases(
-        model=folder_with_hd_bm_parameter_files,
+        model=folder_with_hd_bm_slim_parameter_files,
         list_of_lists=input_image_names,
         output_filenames=output_names,
         folds=(0, 1, 2, 3, 4),
@@ -130,8 +139,11 @@ def main():
         overwrite_existing=not keep_existing,
         all_in_gpu=False,
     )
+
     enablePrint()
-    print("Finished predicting HD-BM.")
+    print("Evaluating the results ...")
+    evaluate_folder(output_folder, groundtruth_folder, labels=(1, 2))
+    print("Finished predicting and evaluating HD-BM Slim.\n Exiting.")
 
 
 if __name__ == "__main__":

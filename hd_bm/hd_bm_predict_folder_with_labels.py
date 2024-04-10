@@ -11,12 +11,15 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
+import os
 from batchgenerators.utilities.file_and_folder_operations import subfiles
+import numpy as np
 
 from hd_bm.utils import blockPrint, enablePrint
 
 blockPrint()
 from nnunet.inference.predict import predict_cases
+from nnunet.evaluation.evaluator import evaluate_folder
 
 enablePrint()
 import argparse
@@ -50,6 +53,13 @@ def main():
         required=True,
         help="Output folder. This is where the resulting segmentations will be saved. Cannot be the "
         "same folder as the input folder. If output_folder does not exist it will be created",
+    )
+    parser.add_argument(
+        "-gt",
+        "--groundtruth_folder",
+        type=str,
+        required=True,
+        help="Folder containing ground truth segmentations for the input cases provided.",
     )
     parser.add_argument(
         "-p",
@@ -89,10 +99,23 @@ def main():
     args = parser.parse_args()
     input_folder = args.input_folder
     output_folder = args.output_folder
+    groundtruth_folder = args.groundtruth_folder
     processes = args.processes
     keep_existing = args.keep_existing
     skip_modality = args.skip_modality_check
     verbose = args.verbose
+
+    os.listdir(input_folder)
+    in_files = subfiles(input_folder, suffix=".nii.gz", join=False, sort=True)
+    in_maybe_case_ids = set(np.unique([i[:-12] for i in in_files]))
+
+    os.listdir(groundtruth_folder)
+    gt_files = subfiles(groundtruth_folder, suffix=".nii.gz", join=False, sort=True)
+    gt_maybe_case_ids = set(np.unique([i[:-7] for i in gt_files]))
+
+    assert in_maybe_case_ids.issubset(
+        gt_maybe_case_ids
+    ), f"Some input files do not have a corresponding ground truth file. {set(in_files) - set(gt_files)}"
 
     maybe_download_weights()
 
@@ -130,8 +153,11 @@ def main():
         overwrite_existing=not keep_existing,
         all_in_gpu=False,
     )
+
     enablePrint()
-    print("Finished predicting HD-BM.")
+    print("Evaluating the results ...")
+    evaluate_folder(output_folder, groundtruth_folder, labels=(1, 2))
+    print("Finished predicting and evaluating HD-BM. \n Exiting.")
 
 
 if __name__ == "__main__":
